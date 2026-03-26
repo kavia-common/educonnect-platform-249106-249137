@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { BookOpen, CalendarDays, Megaphone, NotebookPen } from "lucide-react";
 import { DashboardShell } from "@/components/DashboardShell";
 import { Badge, Card, CardBody, CardHeader, CardTitle, ProgressBar } from "@/components/ui";
-import { fetchDashboard, getApiBaseUrl, getApiMockMode } from "@/lib/api";
+import { fetchDashboard, getApiBaseUrl, getApiMockMode, hasAuthToken } from "@/lib/api";
 import type {
   AnnouncementSummary,
   AssignmentSummary,
@@ -53,9 +54,7 @@ function AnnouncementRow({ ann }: { ann: AnnouncementSummary }) {
     <article className="py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h4 className="truncate text-sm font-semibold text-gray-900">
-            {ann.title}
-          </h4>
+          <h4 className="truncate text-sm font-semibold text-gray-900">{ann.title}</h4>
           <p className="mt-1 line-clamp-2 text-sm text-gray-600">{ann.body}</p>
           <div className="mt-1 text-xs text-gray-500">
             {ann.authorName} • {formatDate(ann.publishedAt)}
@@ -71,9 +70,7 @@ function GradeRow({ g }: { g: GradeSummary }) {
     <div className="py-2">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-gray-900">
-            {g.courseCode}
-          </div>
+          <div className="truncate text-sm font-medium text-gray-900">{g.courseCode}</div>
           <div className="truncate text-xs text-gray-600">{g.courseTitle}</div>
         </div>
         <div className="text-sm font-semibold text-gray-900">{g.currentPercent}%</div>
@@ -86,6 +83,10 @@ function GradeRow({ g }: { g: GradeSummary }) {
 }
 
 export default function Home() {
+  const router = useRouter();
+
+  const [authChecked, setAuthChecked] = React.useState(false);
+
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -96,6 +97,17 @@ export default function Home() {
   const [announcements, setAnnouncements] = React.useState<AnnouncementSummary[]>([]);
 
   React.useEffect(() => {
+    // Client-side route gating for static export.
+    if (!hasAuthToken()) {
+      router.replace(`/login?next=${encodeURIComponent("/")}`);
+      return;
+    }
+    setAuthChecked(true);
+  }, [router]);
+
+  React.useEffect(() => {
+    if (!authChecked) return;
+
     let mounted = true;
     (async () => {
       setLoading(true);
@@ -119,7 +131,18 @@ export default function Home() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [authChecked]);
+
+  if (!authChecked) {
+    // Avoid flashing dashboard content before redirect.
+    return (
+      <main className="min-h-screen bg-gray-50">
+        <div className="mx-auto max-w-2xl px-4 py-10 text-sm text-gray-600">
+          Redirecting to login…
+        </div>
+      </main>
+    );
+  }
 
   return (
     <DashboardShell
@@ -131,12 +154,8 @@ export default function Home() {
       }
       right={
         <div className="hidden items-center gap-2 text-xs text-gray-500 lg:flex">
-          <span className="rounded-full bg-gray-100 px-2 py-1">
-            API: {getApiBaseUrl()}
-          </span>
-          <span className="rounded-full bg-gray-100 px-2 py-1">
-            Mock: {getApiMockMode()}
-          </span>
+          <span className="rounded-full bg-gray-100 px-2 py-1">API: {getApiBaseUrl()}</span>
+          <span className="rounded-full bg-gray-100 px-2 py-1">Mock: {getApiMockMode()}</span>
         </div>
       }
     >
@@ -170,9 +189,7 @@ export default function Home() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-xs font-medium text-gray-500">
-                          {c.code}
-                        </div>
+                        <div className="text-xs font-medium text-gray-500">{c.code}</div>
                         <div className="truncate text-sm font-semibold text-gray-900">
                           {c.title}
                         </div>
