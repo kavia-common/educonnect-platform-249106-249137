@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
-import { BookOpen, CalendarDays, Megaphone, NotebookPen } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, CalendarDays, Megaphone, NotebookPen, Shield, Users } from "lucide-react";
 import { DashboardShell } from "@/components/DashboardShell";
 import { Badge, Card, CardBody, CardHeader, CardTitle, ProgressBar } from "@/components/ui";
-import { fetchDashboard, getApiBaseUrl, getApiMockMode, hasAuthToken } from "@/lib/api";
+import { fetchDashboard, getApiBaseUrl, getApiMockMode } from "@/lib/api";
+import { RoleGate } from "@/components/RoleGate";
+import { useAuth } from "@/components/AuthProvider";
 import type {
   AnnouncementSummary,
   AssignmentSummary,
@@ -83,9 +85,9 @@ function GradeRow({ g }: { g: GradeSummary }) {
 }
 
 export default function Home() {
-  const router = useRouter();
+  const { user } = useAuth();
 
-  const [authChecked, setAuthChecked] = React.useState(false);
+  const role = user?.role ?? "student";
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -97,16 +99,8 @@ export default function Home() {
   const [announcements, setAnnouncements] = React.useState<AnnouncementSummary[]>([]);
 
   React.useEffect(() => {
-    // Client-side route gating for static export.
-    if (!hasAuthToken()) {
-      router.replace(`/login?next=${encodeURIComponent("/")}`);
-      return;
-    }
-    setAuthChecked(true);
-  }, [router]);
-
-  React.useEffect(() => {
-    if (!authChecked) return;
+    // Only load student aggregate when role is student. Teacher/admin dashboards are scaffolded separately.
+    if (role !== "student") return;
 
     let mounted = true;
     (async () => {
@@ -131,157 +125,244 @@ export default function Home() {
     return () => {
       mounted = false;
     };
-  }, [authChecked]);
-
-  if (!authChecked) {
-    // Avoid flashing dashboard content before redirect.
-    return (
-      <main className="min-h-screen bg-gray-50">
-        <div className="mx-auto max-w-2xl px-4 py-10 text-sm text-gray-600">
-          Redirecting to login…
-        </div>
-      </main>
-    );
-  }
+  }, [role]);
 
   return (
-    <DashboardShell
-      title="Dashboard"
-      subtitle={
-        studentName
-          ? `Welcome back, ${studentName}. Here’s what’s coming up this week.`
-          : "Your overview for courses, assignments, grades, and announcements."
-      }
-      right={
-        <div className="hidden items-center gap-2 text-xs text-gray-500 lg:flex">
-          <span className="rounded-full bg-gray-100 px-2 py-1">API: {getApiBaseUrl()}</span>
-          <span className="rounded-full bg-gray-100 px-2 py-1">Mock: {getApiMockMode()}</span>
-        </div>
-      }
-    >
-      {error ? (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Courses */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-blue-600" />
-              <CardTitle>Your courses</CardTitle>
-            </div>
-            <Badge variant="neutral">{courses.length}</Badge>
-          </CardHeader>
-          <CardBody>
-            {loading ? (
-              <div className="text-sm text-gray-600">Loading courses…</div>
-            ) : courses.length === 0 ? (
-              <div className="text-sm text-gray-600">No courses yet.</div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {courses.map((c) => (
-                  <div
-                    key={c.id}
-                    className="rounded-lg border border-gray-200 bg-white p-3 hover:bg-gray-50"
+    <RoleGate>
+      <DashboardShell
+        title="Dashboard"
+        subtitle={
+          role === "admin"
+            ? "Admin overview and management shortcuts."
+            : role === "teacher"
+              ? "Teacher overview and course management shortcuts."
+              : studentName
+                ? `Welcome back, ${studentName}. Here’s what’s coming up this week.`
+                : "Your overview for courses, assignments, grades, and announcements."
+        }
+        right={
+          <div className="hidden items-center gap-2 text-xs text-gray-500 lg:flex">
+            <span className="rounded-full bg-gray-100 px-2 py-1">
+              API: {getApiBaseUrl()}
+            </span>
+            <span className="rounded-full bg-gray-100 px-2 py-1">
+              Mock: {getApiMockMode()}
+            </span>
+          </div>
+        }
+      >
+        {role === "teacher" ? (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-blue-600" />
+                  <CardTitle>Teacher tools</CardTitle>
+                </div>
+                <Badge variant="info">Teacher</Badge>
+              </CardHeader>
+              <CardBody>
+                <div className="text-sm text-gray-700">
+                  Manage courses, assignments, and announcements.
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                    href="/teacher"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-xs font-medium text-gray-500">{c.code}</div>
-                        <div className="truncate text-sm font-semibold text-gray-900">
-                          {c.title}
-                        </div>
-                        <div className="mt-1 truncate text-xs text-gray-600">
-                          {c.instructorName}
-                        </div>
-                      </div>
-                      {c.meetingTimes ? (
-                        <Badge variant="info" className="shrink-0">
-                          {c.meetingTimes}
-                        </Badge>
-                      ) : null}
-                    </div>
+                    Go to Teacher area
+                  </Link>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-blue-600" />
+                  <CardTitle>Upcoming</CardTitle>
+                </div>
+              </CardHeader>
+              <CardBody>
+                <div className="text-sm text-gray-600">
+                  Teacher dashboards are scaffolded; connect teacher endpoints next.
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+        ) : role === "admin" ? (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-600" />
+                  <CardTitle>Admin tools</CardTitle>
+                </div>
+                <Badge variant="warning">Admin</Badge>
+              </CardHeader>
+              <CardBody>
+                <div className="text-sm text-gray-700">
+                  Manage users, roles, courses, and system settings.
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                    href="/admin"
+                  >
+                    Go to Admin area
+                  </Link>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-blue-600" />
+                  <CardTitle>Notes</CardTitle>
+                </div>
+              </CardHeader>
+              <CardBody>
+                <div className="text-sm text-gray-600">
+                  Admin dashboards are scaffolded; connect admin endpoints next.
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+        ) : (
+          <>
+            {error ? (
+              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                {error}
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              {/* Courses */}
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-blue-600" />
+                    <CardTitle>Your courses</CardTitle>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
+                  <Badge variant="neutral">{courses.length}</Badge>
+                </CardHeader>
+                <CardBody>
+                  {loading ? (
+                    <div className="text-sm text-gray-600">Loading courses…</div>
+                  ) : courses.length === 0 ? (
+                    <div className="text-sm text-gray-600">No courses yet.</div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {courses.map((c) => (
+                        <div
+                          key={c.id}
+                          className="rounded-lg border border-gray-200 bg-white p-3 hover:bg-gray-50"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-xs font-medium text-gray-500">
+                                {c.code}
+                              </div>
+                              <div className="truncate text-sm font-semibold text-gray-900">
+                                {c.title}
+                              </div>
+                              <div className="mt-1 truncate text-xs text-gray-600">
+                                {c.instructorName}
+                              </div>
+                            </div>
+                            {c.meetingTimes ? (
+                              <Badge variant="info" className="shrink-0">
+                                {c.meetingTimes}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
 
-        {/* Upcoming assignments */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <NotebookPen className="h-4 w-4 text-blue-600" />
-              <CardTitle>Upcoming</CardTitle>
-            </div>
-            <Badge variant="neutral">{upcoming.length}</Badge>
-          </CardHeader>
-          <CardBody>
-            {loading ? (
-              <div className="text-sm text-gray-600">Loading assignments…</div>
-            ) : upcoming.length === 0 ? (
-              <div className="text-sm text-gray-600">No upcoming work.</div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {upcoming.slice(0, 6).map((a) => (
-                  <AssignmentRow key={a.id} a={a} courses={courses} />
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
+              {/* Upcoming assignments */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <NotebookPen className="h-4 w-4 text-blue-600" />
+                    <CardTitle>Upcoming</CardTitle>
+                  </div>
+                  <Badge variant="neutral">{upcoming.length}</Badge>
+                </CardHeader>
+                <CardBody>
+                  {loading ? (
+                    <div className="text-sm text-gray-600">
+                      Loading assignments…
+                    </div>
+                  ) : upcoming.length === 0 ? (
+                    <div className="text-sm text-gray-600">No upcoming work.</div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {upcoming.slice(0, 6).map((a) => (
+                        <AssignmentRow key={a.id} a={a} courses={courses} />
+                      ))}
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
 
-        {/* Grades */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-                %
-              </span>
-              <CardTitle>Grades</CardTitle>
-            </div>
-          </CardHeader>
-          <CardBody>
-            {loading ? (
-              <div className="text-sm text-gray-600">Loading grades…</div>
-            ) : grades.length === 0 ? (
-              <div className="text-sm text-gray-600">No grades posted.</div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {grades.map((g) => (
-                  <GradeRow key={g.courseId} g={g} />
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
+              {/* Grades */}
+              <Card className="lg:col-span-1">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                      %
+                    </span>
+                    <CardTitle>Grades</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardBody>
+                  {loading ? (
+                    <div className="text-sm text-gray-600">Loading grades…</div>
+                  ) : grades.length === 0 ? (
+                    <div className="text-sm text-gray-600">No grades posted.</div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {grades.map((g) => (
+                        <GradeRow key={g.courseId} g={g} />
+                      ))}
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
 
-        {/* Announcements */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Megaphone className="h-4 w-4 text-blue-600" />
-              <CardTitle>Announcements</CardTitle>
+              {/* Announcements */}
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Megaphone className="h-4 w-4 text-blue-600" />
+                    <CardTitle>Announcements</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardBody>
+                  {loading ? (
+                    <div className="text-sm text-gray-600">
+                      Loading announcements…
+                    </div>
+                  ) : announcements.length === 0 ? (
+                    <div className="text-sm text-gray-600">No announcements.</div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {announcements.slice(0, 6).map((ann) => (
+                        <AnnouncementRow key={ann.id} ann={ann} />
+                      ))}
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
             </div>
-          </CardHeader>
-          <CardBody>
-            {loading ? (
-              <div className="text-sm text-gray-600">Loading announcements…</div>
-            ) : announcements.length === 0 ? (
-              <div className="text-sm text-gray-600">No announcements.</div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {announcements.slice(0, 6).map((ann) => (
-                  <AnnouncementRow key={ann.id} ann={ann} />
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      </div>
-    </DashboardShell>
+          </>
+        )}
+      </DashboardShell>
+    </RoleGate>
   );
 }

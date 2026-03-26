@@ -5,36 +5,60 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bell,
-  BookOpen,
-  CalendarDays,
   GraduationCap,
   LayoutDashboard,
   Menu,
-  NotebookPen,
-  Settings,
+  Shield,
   User,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Container } from "@/components/ui";
 import { logout } from "@/lib/api";
+import { useAuth } from "@/components/AuthProvider";
+import type { UserRole } from "@/lib/types";
 
 type NavItem = {
   label: string;
   href: string;
   icon: React.ReactNode;
+  roles: UserRole[];
 };
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", href: "/", icon: <LayoutDashboard className="h-4 w-4" /> },
-  { label: "Courses", href: "/courses", icon: <BookOpen className="h-4 w-4" /> },
-  { label: "Assignments", href: "/assignments", icon: <NotebookPen className="h-4 w-4" /> },
-  { label: "Grades", href: "/grades", icon: <GraduationCap className="h-4 w-4" /> },
-  { label: "Calendar", href: "/calendar", icon: <CalendarDays className="h-4 w-4" /> },
-  { label: "Profile", href: "/profile", icon: <User className="h-4 w-4" /> },
-  { label: "Settings", href: "/settings", icon: <Settings className="h-4 w-4" /> },
-];
+function getNavItems(role: UserRole): NavItem[] {
+  const all: NavItem[] = [
+    {
+      label: "Dashboard",
+      href: "/",
+      icon: <LayoutDashboard className="h-4 w-4" />,
+      roles: ["student", "teacher", "admin"],
+    },
+    {
+      label: "Teacher",
+      href: "/teacher",
+      icon: <Users className="h-4 w-4" />,
+      roles: ["teacher", "admin"],
+    },
+    {
+      label: "Admin",
+      href: "/admin",
+      icon: <Shield className="h-4 w-4" />,
+      roles: ["admin"],
+    },
+  ];
 
-function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+  return all.filter((i) => i.roles.includes(role));
+}
+
+function SidebarNav({
+  role,
+  onNavigate,
+}: {
+  role: UserRole;
+  onNavigate?: () => void;
+}) {
+  const navItems = React.useMemo(() => getNavItems(role), [role]);
+
   return (
     <nav className="flex flex-col gap-1 p-3">
       {navItems.map((item) => (
@@ -66,6 +90,9 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
+
+  const role: UserRole = user?.role ?? "student";
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [loggingOut, setLoggingOut] = React.useState(false);
@@ -107,7 +134,11 @@ export function DashboardShell({
                   EduConnect
                 </div>
                 <div className="text-xs text-gray-500">
-                  Student & educator portal
+                  {role === "admin"
+                    ? "Admin portal"
+                    : role === "teacher"
+                      ? "Teacher portal"
+                      : "Student portal"}
                 </div>
               </div>
             </Link>
@@ -136,7 +167,14 @@ export function DashboardShell({
               <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-700">
                 <User className="h-4 w-4" />
               </span>
-              <span className="text-sm text-gray-700">Account</span>
+              <div className="leading-tight">
+                <div className="max-w-[160px] truncate text-sm text-gray-700">
+                  {user?.fullName ?? "Account"}
+                </div>
+                <div className="text-[11px] uppercase tracking-wide text-gray-500">
+                  {role}
+                </div>
+              </div>
             </div>
           </div>
         </Container>
@@ -150,7 +188,7 @@ export function DashboardShell({
               Navigation
             </div>
           </div>
-          <SidebarNav />
+          <SidebarNav role={role} />
         </aside>
 
         {/* Main */}
@@ -187,7 +225,9 @@ export function DashboardShell({
                   <div className="text-sm font-semibold text-gray-900">
                     EduConnect
                   </div>
-                  <div className="text-xs text-gray-500">Menu</div>
+                  <div className="text-xs text-gray-500">
+                    {user?.fullName ? `${user.fullName} • ${role}` : role}
+                  </div>
                 </div>
               </div>
               <button
@@ -199,7 +239,7 @@ export function DashboardShell({
               </button>
             </div>
 
-            <SidebarNav onNavigate={() => setMobileOpen(false)} />
+            <SidebarNav role={role} onNavigate={() => setMobileOpen(false)} />
 
             <div className="border-t border-gray-100 p-4">
               <button
