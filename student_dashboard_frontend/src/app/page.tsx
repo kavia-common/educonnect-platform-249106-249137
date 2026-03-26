@@ -4,7 +4,7 @@ import * as React from "react";
 import { BookOpen, CalendarDays, Megaphone, NotebookPen } from "lucide-react";
 import { DashboardShell } from "@/components/DashboardShell";
 import { Badge, Card, CardBody, CardHeader, CardTitle, ProgressBar } from "@/components/ui";
-import { fetchDashboard, getApiBaseUrl } from "@/lib/api";
+import { fetchDashboard, getApiBaseUrl, getApiMockMode } from "@/lib/api";
 import type {
   AnnouncementSummary,
   AssignmentSummary,
@@ -133,6 +133,9 @@ export default function Home() {
         <div className="hidden items-center gap-2 text-xs text-gray-500 lg:flex">
           <span className="rounded-full bg-gray-100 px-2 py-1">
             API: {getApiBaseUrl()}
+          </span>
+          <span className="rounded-full bg-gray-100 px-2 py-1">
+            Mock: {getApiMockMode()}
           </span>
         </div>
       }

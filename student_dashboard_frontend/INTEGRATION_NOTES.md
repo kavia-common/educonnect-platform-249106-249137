@@ -15,10 +15,28 @@ This response aggregates:
 Until the backend is implemented, the frontend falls back to mock data (see `src/lib/api.ts`).
 
 ## Backend status (as of current OpenAPI)
-The backend OpenAPI currently only exposes:
+Backend now exposes live endpoints:
+
+Health:
 - `GET /` (health check)
 
-No `/api/*` routes exist yet, so full integration is blocked.
+Auth (DEV scaffolding):
+- `POST /api/auth/login` → `{ token, userEmail, role }`
+- `POST /api/auth/logout` → `{}` (no-op in DEV)
+- `GET /api/auth/me` → `{ email, fullName, role }`
+
+Dashboard:
+- `GET /api/students/me/dashboard` → `DashboardResponse`
+
+Lists:
+- `GET /api/courses`
+- `GET /api/assignments?status=upcoming|all`
+- `GET /api/announcements?limit=20`
+- `GET /api/notifications?limit=20`
+
+DEV auth mechanism:
+- Use `Authorization: Bearer dev:<email>` (token is returned by login and stored client-side).
+Seed emails include: `student1@educonnect.test`, `teacher1@educonnect.test`.
 
 ## Required backend endpoints (minimum for dashboard)
 Suggested FastAPI endpoints:
@@ -56,7 +74,13 @@ Tables (minimum viable):
 
 ## Env vars needed (frontend)
 Build-time:
-- `NEXT_PUBLIC_BACKEND_URL` (base URL of FastAPI, e.g. `https://...:3001`)
+- `NEXT_PUBLIC_API_BASE_URL` (base URL of FastAPI, e.g. `https://...:3001`)
+
+Optional (build-time):
+- `NEXT_PUBLIC_API_MOCK_MODE`:
+  - `off` (default): call backend and surface errors (no silent fallback)
+  - `fallback`: fall back to mock data when backend is unreachable
+  - `on`: always use mock data
 
 ## Notes on static export constraint
 With `output: "export"`, Next.js App Router pages are pre-rendered and there are limitations:
