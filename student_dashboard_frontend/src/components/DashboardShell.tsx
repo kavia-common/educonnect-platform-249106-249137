@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   BookOpen,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Container } from "@/components/ui";
+import { logout } from "@/lib/api";
 
 type NavItem = {
   label: string;
@@ -63,7 +65,23 @@ export function DashboardShell({
   right?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [loggingOut, setLoggingOut] = React.useState(false);
+
+  async function handleLogout() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      // Clears persisted token; backend call is best-effort.
+      await logout();
+    } finally {
+      // Always redirect to login even if backend is unreachable.
+      router.replace("/login");
+      setLoggingOut(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -104,6 +122,16 @@ export function DashboardShell({
             >
               <Bell className="h-5 w-5" />
             </button>
+
+            <button
+              type="button"
+              className="hidden rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 sm:inline-flex disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={handleLogout}
+              disabled={loggingOut}
+            >
+              {loggingOut ? "Logging out…" : "Logout"}
+            </button>
+
             <div className="hidden items-center gap-2 rounded-full border border-gray-200 bg-white px-2 py-1 shadow-sm sm:flex">
               <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-700">
                 <User className="h-4 w-4" />
@@ -139,7 +167,11 @@ export function DashboardShell({
 
       {/* Mobile drawer */}
       {mobileOpen ? (
-        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true">
+        <div
+          className="fixed inset-0 z-40 md:hidden"
+          role="dialog"
+          aria-modal="true"
+        >
           <button
             className="absolute inset-0 bg-black/30"
             aria-label="Close menu"
@@ -166,7 +198,19 @@ export function DashboardShell({
                 Close
               </button>
             </div>
+
             <SidebarNav onNavigate={() => setMobileOpen(false)} />
+
+            <div className="border-t border-gray-100 p-4">
+              <button
+                type="button"
+                className="inline-flex w-full items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleLogout}
+                disabled={loggingOut}
+              >
+                {loggingOut ? "Logging out…" : "Logout"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
